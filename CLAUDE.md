@@ -24,4 +24,4 @@ RollCall is a mobile-first PWA for Sathyabama students: manual attendance tracki
 - Regenerate tokens: edit `design/tokens.json`, then the generator in `design/` → `styles/tokens.css`; validate with `python design/check_contrast.py`.
 
 ## Current phase
-Phase 3 done (scaffold). Next: Phase 4 (Supabase schema, RLS, auth).
+Phase 4 done (local): Supabase schema + RLS + auth working on local Docker. Run `npx supabase start` then `npm run dev`; keys in `.env.local`. A cloud project is still needed before real users. Next: Phase 5 — wire Today/Attendance to real data (subjects, timetable, session generation, live %).
