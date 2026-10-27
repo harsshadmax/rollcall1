@@ -78,6 +78,53 @@ body {
   box-shadow: var(--shadow-card, 0 6px 20px rgba(20, 20, 30, 0.08));
 }
 
+.rc-field {
+  width: 100%;
+  padding: 13px 14px;
+  border-radius: var(--radius-md, 20px);
+  border: 1.5px solid #e7e5f0;
+  background: var(--color-surface);
+  font-size: 15px;
+  font-family: inherit;
+  color: var(--color-ink);
+}
+.rc-field:focus {
+  outline: none;
+  border-color: var(--color-ink);
+}
+.rc-submit {
+  padding: 14px;
+  border-radius: var(--radius-md, 20px);
+  border: none;
+  background: var(--color-ink);
+  color: #fff;
+  font-weight: 700;
+  font-size: 15px;
+  cursor: pointer;
+}
+.rc-submit:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.rc-rowbtn {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 12px 0;
+  background: none;
+  border: none;
+  border-top: 1px solid #f0eff5;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-ink);
+  cursor: pointer;
+  font-family: inherit;
+}
+.rc-rowbtn:first-of-type {
+  border-top: none;
+}
+
 /* Dark floating bottom nav */
 .rc-nav {
   position: fixed;

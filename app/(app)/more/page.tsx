@@ -1,3 +1,5 @@
+import { AccountActions } from "@/components/features/AccountActions";
+
 export default function MorePage() {
   return (
     <>
@@ -8,6 +10,7 @@ export default function MorePage() {
         <div className="rc-tag">Stats · Calendar · Settings</div>
         <p style={{ marginTop: 6 }}>Streaks, the year calendar, data export and settings land here.</p>
       </div>
+      <AccountActions />
     </>
   );
 }
