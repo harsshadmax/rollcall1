@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RollCall tokens</title>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* tokens inlined for a self-contained preview; source of truth is styles/tokens.css */
+:root{
+  --color-bg:#FAF9FE; --color-surface:#FFFFFF; --color-ink:#141417; --color-ink-muted:#67676E;
+  --color-nav-surface:#17171B; --color-nav-ink:#FFFFFF;
+  --color-green:#B3F4A5; --color-lavender:#CBB5F7; --color-purple:#ADA0F1; --color-orange:#F7B858;
+  --color-blue:#AACBFC; --color-pink:#F2A7D3; --color-peach:#EF9D90; --color-yellow:#F5D655;
+  --color-safe:#1E7A43; --color-warn:#8A5A00; --color-risk:#B23A22;
+  --font-display:'Poppins',system-ui,sans-serif; --font-body:'Inter',system-ui,sans-serif;
+  --r-sm:12px; --r-md:20px; --r-lg:28px; --r-pill:999px;
+  --shadow-card:0 6px 20px rgba(20,20,30,.08); --shadow-nav:0 8px 24px rgba(20,20,30,.18);
+}
+*{box-sizing:border-box;}
+body{margin:0;background:var(--color-bg);color:var(--color-ink);font-family:var(--font-body);
+     padding:20px 16px 90px;-webkit-font-smoothing:antialiased;}
+.wrap{max-width:420px;margin:0 auto;display:flex;flex-direction:column;gap:16px;}
+h1,.display,.big,.hero{font-family:var(--font-display);}
+.muted{color:var(--color-ink-muted);font-size:14px;}
+.topbar{display:flex;align-items:center;gap:12px;}
+.avatar{width:44px;height:44px;border-radius:var(--r-pill);background:var(--color-purple);}
+.card{background:var(--color-surface);border-radius:var(--r-lg);padding:18px;box-shadow:var(--shadow-card);}
+.hero-card{background:var(--color-lavender);border-radius:var(--r-lg);padding:20px;box-shadow:var(--shadow-card);}
+.hero{font-size:26px;font-weight:800;margin:0;}
+.datestrip{display:flex;gap:8px;overflow:auto;}
+.day{min-width:52px;text-align:center;padding:10px 0;border-radius:var(--r-md);background:var(--color-surface);
+     box-shadow:var(--shadow-card);font-size:13px;}
+.day.active{background:var(--color-ink);color:#fff;}
+.day .n{font-family:var(--font-display);font-weight:700;font-size:18px;display:block;}
+.bento{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.tile{border-radius:var(--r-lg);padding:16px;box-shadow:var(--shadow-card);min-height:116px;
+      display:flex;flex-direction:column;justify-content:space-between;}
+.tag{font-size:12px;color:var(--color-ink-muted);text-transform:uppercase;letter-spacing:.06em;}
+.chip-row{display:flex;gap:8px;flex-wrap:wrap;}
+.chip{border-radius:var(--r-pill);padding:8px 14px;font-size:13px;font-weight:600;box-shadow:var(--shadow-card);}
+.big{font-size:32px;font-weight:800;line-height:1;}
+.meter{height:12px;border-radius:999px;overflow:hidden;background:#Eceaf4;margin-top:8px;}
+.meter>i{display:block;height:100%;background:var(--color-green);}
+.nav{position:fixed;left:50%;transform:translateX(-50%);bottom:18px;width:min(380px,90vw);
+     background:var(--color-nav-surface);color:var(--color-nav-ink);border-radius:var(--r-pill);
+     box-shadow:var(--shadow-nav);display:flex;justify-content:space-around;align-items:center;padding:12px 10px;font-size:11px;}
+.nav .item{text-align:center;opacity:.65;}
+.nav .item.active{opacity:1;}
+.nav .dot{display:block;font-size:17px;}
+.swatches{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
+.sw{border-radius:var(--r-sm);padding:10px;font-size:11px;box-shadow:var(--shadow-card);}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="topbar">
+    <div class="avatar"></div>
+    <div><div style="font-weight:700;">Hello, Alex</div><div class="muted">Today 27 Oct</div></div>
+  </div>
+
+  <!-- S4-style hero -->
+  <div class="hero-card">
+    <div class="tag" style="color:#4b3b73;">Next class · 10:00</div>
+    <p class="hero">Data Structures</p>
+    <div class="muted" style="color:#4b3b73;">Room 402 · in 25 min</div>
+  </div>
+
+  <!-- date strip (S4) -->
+  <div class="datestrip">
+    <div class="day">Sun<span class="n">26</span></div>
+    <div class="day active">Mon<span class="n">27</span></div>
+    <div class="day">Tue<span class="n">28</span></div>
+    <div class="day">Wed<span class="n">29</span></div>
+    <div class="day">Thu<span class="n">30</span></div>
+  </div>
+
+  <!-- quick mark chips -->
+  <div class="chip-row">
+    <span class="chip" style="background:var(--color-green);">Present</span>
+    <span class="chip" style="background:var(--color-peach);">Absent</span>
+    <span class="chip" style="background:var(--color-surface);">Cancelled</span>
+  </div>
+
+  <!-- bento tiles -->
+  <div class="bento">
+    <div class="tile" style="background:var(--color-green);">
+      <div class="tag" style="color:#1f5c33;">Data Structures</div>
+      <div><div class="big">92%</div><div style="font-size:13px;font-weight:600;color:#1f5c33;">can skip 4</div></div>
+    </div>
+    <div class="tile" style="background:var(--color-orange);">
+      <div class="tag" style="color:#6b4a00;">Operating Systems</div>
+      <div><div class="big">84%</div><div style="font-size:13px;font-weight:600;color:#6b4a00;">can skip 2</div></div>
+    </div>
+    <div class="tile" style="background:var(--color-blue);">
+      <div class="tag" style="color:#23456e;">Networks</div>
+      <div><div class="big">79%</div><div style="font-size:13px;font-weight:600;color:#23456e;">can skip 1</div></div>
+    </div>
+    <div class="tile" style="background:var(--color-peach);">
+      <div class="tag" style="color:#7a2d1c;">Discrete Maths</div>
+      <div><div class="big">71%</div><div style="font-size:13px;font-weight:600;color:#7a2d1c;">attend 3 more</div></div>
+    </div>
+  </div>
+
+  <!-- overall white card -->
+  <div class="card">
+    <div class="tag">Overall attendance</div>
+    <div class="big" style="color:var(--color-safe);">84%</div>
+    <div class="muted">Above the 80% line</div>
+    <div class="meter"><i style="width:84%;"></i></div>
+  </div>
+
+  <div class="card">
+    <div class="tag" style="margin-bottom:8px;">Palette</div>
+    <div class="swatches">
+      <div class="sw" style="background:var(--color-green);">green</div>
+      <div class="sw" style="background:var(--color-lavender);">lavender</div>
+      <div class="sw" style="background:var(--color-orange);">orange</div>
+      <div class="sw" style="background:var(--color-blue);">blue</div>
+      <div class="sw" style="background:var(--color-pink);">pink</div>
+      <div class="sw" style="background:var(--color-peach);">peach</div>
+    </div>
+  </div>
+</div>
+
+<div class="nav">
+  <div class="item active"><span class="dot">⌂</span>Today</div>
+  <div class="item"><span class="dot">◷</span>Attendance</div>
+  <div class="item"><span class="dot">▦</span>Timetable</div>
+  <div class="item"><span class="dot">★</span>Marks</div>
+  <div class="item"><span class="dot">⋯</span>More</div>
+</div>
+</body>
+</html>

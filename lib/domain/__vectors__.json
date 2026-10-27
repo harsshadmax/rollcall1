@@ -1,0 +1,84 @@
+{
+  "_comment": "Test vectors for RollCall pure-domain functions. Loaded by lib/domain/*.test.ts (Phase 5). Sources: docs/domain-formulas.md and docs/sathyabama-rules.md. Keep in sync with those docs.",
+  "attendancePct": [
+    { "name": "sist sample dossier", "present": 23, "absent": 3, "cancelled": 0, "expectPct": 88.46 },
+    { "name": "sistmate hero", "present": 42, "absent": 6, "cancelled": 0, "expectPct": 87.5 },
+    { "name": "cancelled excluded", "present": 10, "absent": 0, "cancelled": 5, "expectPct": 100 },
+    { "name": "no held classes", "present": 0, "absent": 0, "cancelled": 3, "expectPct": null }
+  ],
+  "canSkip": [
+    { "name": "formula doc worked A", "attended": 60, "held": 70, "threshold": 0.80, "expectCanSkip": 5, "expectMustAttend": 0 },
+    { "name": "sistmate hero 87.5%", "attended": 42, "held": 48, "threshold": 0.80, "expectCanSkip": 4, "expectMustAttend": 0 },
+    { "name": "exactly on the line", "attended": 40, "held": 50, "threshold": 0.80, "expectCanSkip": 0, "expectMustAttend": 0 },
+    { "name": "below the line must attend", "attended": 30, "held": 50, "threshold": 0.80, "expectCanSkip": 0, "expectMustAttend": 50 },
+    { "name": "75pct threshold variant", "attended": 60, "held": 70, "threshold": 0.75, "expectCanSkip": 10, "expectMustAttend": 0 },
+    { "name": "practical 100pct missed one unrecoverable", "attended": 9, "held": 10, "threshold": 1.0, "expectCanSkip": 0, "expectMustAttend": null, "expectUnrecoverable": true },
+    { "name": "practical 100pct perfect", "attended": 10, "held": 10, "threshold": 1.0, "expectCanSkip": 0, "expectMustAttend": 0 }
+  ],
+  "gpa": [
+    {
+      "name": "formula doc worked semester",
+      "courses": [
+        { "credits": 4, "grade": "A++" },
+        { "credits": 3, "grade": "A+" },
+        { "credits": 3, "grade": "A+" },
+        { "credits": 4, "grade": "B++" }
+      ],
+      "expectGpa": 9.0
+    },
+    {
+      "name": "RA excluded from GPA",
+      "courses": [
+        { "credits": 4, "grade": "A++" },
+        { "credits": 3, "grade": "A+" },
+        { "credits": 3, "grade": "A+" },
+        { "credits": 4, "grade": "B++" },
+        { "credits": 3, "grade": "RA" }
+      ],
+      "expectGpa": 9.0
+    },
+    {
+      "name": "all C floor",
+      "courses": [{ "credits": 3, "grade": "C" }, { "credits": 3, "grade": "C" }],
+      "expectGpa": 6.0
+    }
+  ],
+  "cgpa": [
+    {
+      "name": "two semesters credit-weighted",
+      "semesters": [
+        { "courses": [{ "credits": 4, "grade": "A++" }, { "credits": 4, "grade": "B+" }] },
+        { "courses": [{ "credits": 3, "grade": "A+" }, { "credits": 3, "grade": "C" }] }
+      ],
+      "expectCgpa": 8.07,
+      "expectPercentEquiv": 80.7
+    }
+  ],
+  "gradeScaleSathyabama": {
+    "_note": "default seeded scale; editable per account",
+    "bands": [
+      { "min": 90, "max": 100, "grade": "A++", "points": 10, "countsInGpa": true },
+      { "min": 80, "max": 89, "grade": "A+", "points": 9, "countsInGpa": true },
+      { "min": 70, "max": 79, "grade": "B++", "points": 8, "countsInGpa": true },
+      { "min": 60, "max": 69, "grade": "B+", "points": 7, "countsInGpa": true },
+      { "min": 50, "max": 59, "grade": "C", "points": 6, "countsInGpa": true },
+      { "min": 0, "max": 49, "grade": "RA", "points": 0, "countsInGpa": false },
+      { "grade": "ABS", "points": 0, "countsInGpa": false },
+      { "grade": "W", "points": 0, "countsInGpa": false },
+      { "grade": "AAA", "points": 0, "countsInGpa": false }
+    ],
+    "passMarkTotal": 50
+  },
+  "defaultThresholds": { "theory": 0.80, "practical": 1.0 },
+  "cgpaTargetPlanner": [
+    {
+      "name": "reach 8.5 over 2 sems",
+      "currentPoints": 160.0,
+      "currentCredits": 20,
+      "futureSemesters": 2,
+      "creditsPerFutureSemester": 20,
+      "targetCgpa": 8.5,
+      "expectNeededAvgGP": 8.75
+    }
+  ]
+}
