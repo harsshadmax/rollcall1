@@ -1,64 +1,58 @@
 "use client";
 
-import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { useState, useTransition } from "react";
+import Link from "next/link";
 import { Face, type Mood } from "./Face";
+import { markSession, markWholeDay } from "@/lib/actions/app";
+import type { DayRow, SessionStatus } from "@/lib/data/types";
 
-export type Status = "present" | "absent" | "cancelled" | "unmarked";
-
-interface Period {
-  id: string;
-  subject: string;
-  time: string;
-  kind: "theory" | "practical";
-  status: Status;
-}
-
-// Sample timetable for the day. Phase 5 generates these rows from the student's real timetable.
-const BASE_PERIODS: Omit<Period, "status">[] = [
-  { id: "p1", subject: "Data Structures", time: "09:00–09:50", kind: "theory" },
-  { id: "p2", subject: "Operating Systems", time: "10:00–10:50", kind: "theory" },
-  { id: "p3", subject: "Computer Networks", time: "11:00–11:50", kind: "theory" },
-  { id: "p4", subject: "Discrete Maths", time: "12:00–12:50", kind: "theory" },
-  { id: "p5", subject: "DBMS Lab", time: "13:30–16:10", kind: "practical" },
-];
-
-const STATUS_META: Record<Status, { label: string; mood: Mood; fill: string }> = {
+const STATUS_META: Record<SessionStatus, { label: string; mood: Mood; fill: string }> = {
   present: { label: "Present", mood: "happy", fill: "var(--color-accent-attendance)" },
   absent: { label: "Absent", mood: "sad", fill: "var(--color-status-risk-fill)" },
   cancelled: { label: "Cancelled", mood: "sleep", fill: "var(--color-accent-calendar)" },
   unmarked: { label: "Not marked", mood: "neutral", fill: "var(--color-surface)" },
 };
 
-function freshPeriods(): Period[] {
-  return BASE_PERIODS.map((p) => ({ ...p, status: "unmarked" }));
+function iso(d: Date) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-export function DayAttendance({ initialDate = "2026-09-24" }: { initialDate?: string }) {
-  const [date, setDate] = useState(() => new Date(initialDate + "T00:00:00"));
-  const [periods, setPeriods] = useState<Period[]>(freshPeriods);
-  // In-memory for now; Phase 4 persists marks to the database per student + date.
+export function DayAttendance({ day, rows }: { day: string; rows: DayRow[] }) {
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
+  const date = new Date(day + "T00:00:00");
 
-  // Day-level: set every non-cancelled period to the chosen status.
-  function markWholeDay(status: Status) {
-    setPeriods((prev) => prev.map((p) => (p.status === "cancelled" ? p : { ...p, status })));
+  // optimistic local view so taps feel instant; server is source of truth on refresh
+  const [local, setLocal] = useState<Record<string, SessionStatus>>({});
+  const statusOf = (subjectId: string, fallback: SessionStatus) => local[subjectId] ?? fallback;
+
+  function goDay(delta: number) {
+    const n = new Date(date);
+    n.setDate(n.getDate() + delta);
+    router.push(`/attendance?day=${iso(n)}`);
   }
 
-  // Per-period: edit one class individually (overrides the day default).
-  function setOne(id: string, status: Status) {
-    setPeriods((prev) => prev.map((p) => (p.id === id ? { ...p, status } : p)));
-  }
-
-  function shiftDay(delta: number) {
-    setDate((d) => {
-      const n = new Date(d);
-      n.setDate(n.getDate() + delta);
-      return n;
+  function wholeDay(status: SessionStatus) {
+    const next: Record<string, SessionStatus> = {};
+    for (const r of rows) if (statusOf(r.subject.id, r.status) !== "cancelled") next[r.subject.id] = status;
+    setLocal((p) => ({ ...p, ...next }));
+    startTransition(async () => {
+      await markWholeDay(day, status);
+      router.refresh();
     });
-    setPeriods(freshPeriods());
   }
 
-  const present = periods.filter((p) => p.status === "present").length;
-  const absent = periods.filter((p) => p.status === "absent").length;
+  function one(subjectId: string, status: SessionStatus) {
+    setLocal((p) => ({ ...p, [subjectId]: status }));
+    startTransition(async () => {
+      await markSession(subjectId, day, status);
+      router.refresh();
+    });
+  }
+
+  const present = rows.filter((r) => statusOf(r.subject.id, r.status) === "present").length;
+  const absent = rows.filter((r) => statusOf(r.subject.id, r.status) === "absent").length;
   const weekday = date.toLocaleDateString("en-GB", { weekday: "long" });
   const nice = date.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
 
@@ -68,105 +62,116 @@ export function DayAttendance({ initialDate = "2026-09-24" }: { initialDate?: st
         Attendance
       </h1>
 
-      {/* date nav */}
       <div className="rc-card" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-        <button aria-label="Previous day" onClick={() => shiftDay(-1)} style={navBtn}>
+        <button aria-label="Previous day" onClick={() => goDay(-1)} style={navBtn}>
           ‹
         </button>
         <div style={{ textAlign: "center" }}>
           <div style={{ fontWeight: 700 }}>{weekday}</div>
           <div className="rc-tag">{nice}</div>
         </div>
-        <button aria-label="Next day" onClick={() => shiftDay(1)} style={navBtn}>
+        <button aria-label="Next day" onClick={() => goDay(1)} style={navBtn}>
           ›
         </button>
       </div>
 
-      {/* day-level mark */}
-      <section className="rc-card" style={{ marginBottom: 12 }}>
-        <div className="rc-tag">Mark the whole day</div>
-        <p style={{ fontSize: 13, color: "var(--color-ink-muted)", margin: "4px 0 10px" }}>
-          Sets every period below. Edit any class after.
-        </p>
-        <div style={{ display: "flex", gap: 10 }}>
-          <button onClick={() => markWholeDay("present")} style={dayBtn("var(--color-ink)", "#fff")}>
-            <Face mood="happy" size={18} /> All present
-          </button>
-          <button onClick={() => markWholeDay("absent")} style={dayBtn("var(--color-status-risk-fill)", "var(--color-ink)")}>
-            <Face mood="sad" size={18} /> All absent
-          </button>
-        </div>
-      </section>
-
-      {/* summary */}
-      <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-        <span className="rc-chip" style={{ background: "var(--color-accent-attendance)" }}>
-          {present} present
-        </span>
-        <span className="rc-chip" style={{ background: "var(--color-status-risk-fill)" }}>
-          {absent} absent
-        </span>
-      </div>
-
-      {/* per-period rows */}
-      <section className="rc-card" style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-        <div className="rc-tag" style={{ marginBottom: 4 }}>
-          Edit individual classes
-        </div>
-        {periods.map((p) => (
-          <div key={p.id} style={{ padding: "10px 0", borderTop: "1px solid #f0eff5" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
-              <span
-                style={{
-                  width: 30,
-                  height: 30,
-                  borderRadius: 9,
-                  background: STATUS_META[p.status].fill,
-                  display: "inline-flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  color: "var(--color-ink)",
-                  flexShrink: 0,
-                  boxShadow: p.status === "unmarked" ? "inset 0 0 0 1.5px #e3e1ec" : "none",
-                }}
-              >
-                <Face mood={STATUS_META[p.status].mood} size={20} />
-              </span>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontWeight: 600, fontSize: 14 }}>{p.subject}</div>
-                <div className="rc-tag">
-                  {p.time} · {p.kind}
-                </div>
-              </div>
+      {rows.length === 0 ? (
+        <section className="rc-card">
+          <div className="rc-tag">No subjects yet</div>
+          <p style={{ margin: "6px 0 10px" }}>Add your subjects first, then mark attendance here.</p>
+          <Link href="/subjects" className="rc-submit" style={{ display: "inline-block", textDecoration: "none" }}>
+            Add subjects
+          </Link>
+        </section>
+      ) : (
+        <>
+          <section className="rc-card" style={{ marginBottom: 12 }}>
+            <div className="rc-tag">Mark the whole day</div>
+            <p style={{ fontSize: 13, color: "var(--color-ink-muted)", margin: "4px 0 10px" }}>
+              Sets every class below. Edit any after.
+            </p>
+            <div style={{ display: "flex", gap: 10 }}>
+              <button onClick={() => wholeDay("present")} disabled={pending} style={dayBtn("var(--color-ink)", "#fff")}>
+                <Face mood="happy" size={18} /> All present
+              </button>
+              <button onClick={() => wholeDay("absent")} disabled={pending} style={dayBtn("var(--color-status-risk-fill)", "var(--color-ink)")}>
+                <Face mood="sad" size={18} /> All absent
+              </button>
             </div>
-            <div style={{ display: "flex", gap: 6 }}>
-              {(["present", "absent", "cancelled"] as Status[]).map((s) => {
-                const on = p.status === s;
-                return (
-                  <button
-                    key={s}
-                    onClick={() => setOne(p.id, s)}
-                    aria-pressed={on}
-                    style={{
-                      flex: 1,
-                      padding: "8px 4px",
-                      borderRadius: 12,
-                      border: "none",
-                      fontSize: 12,
-                      fontWeight: 600,
-                      cursor: "pointer",
-                      background: on ? "var(--color-ink)" : "#f1eff6",
-                      color: on ? "#fff" : "var(--color-ink)",
-                    }}
-                  >
-                    {STATUS_META[s].label}
-                  </button>
-                );
-              })}
-            </div>
+          </section>
+
+          <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+            <span className="rc-chip" style={{ background: "var(--color-accent-attendance)" }}>
+              {present} present
+            </span>
+            <span className="rc-chip" style={{ background: "var(--color-status-risk-fill)" }}>
+              {absent} absent
+            </span>
           </div>
-        ))}
-      </section>
+
+          <section className="rc-card">
+            <div className="rc-tag" style={{ marginBottom: 4 }}>
+              Edit individual classes
+            </div>
+            {rows.map((r) => {
+              const st = statusOf(r.subject.id, r.status);
+              return (
+                <div key={r.subject.id} style={{ padding: "10px 0", borderTop: "1px solid #f0eff5" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+                    <span
+                      style={{
+                        width: 30,
+                        height: 30,
+                        borderRadius: 9,
+                        background: STATUS_META[st].fill,
+                        display: "inline-flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        color: "var(--color-ink)",
+                        flexShrink: 0,
+                        boxShadow: st === "unmarked" ? "inset 0 0 0 1.5px #e3e1ec" : "none",
+                      }}
+                    >
+                      <Face mood={STATUS_META[st].mood} size={20} />
+                    </span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontWeight: 600, fontSize: 14 }}>{r.subject.name}</div>
+                      <div className="rc-tag">
+                        {r.subject.code} · {r.subject.kind}
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", gap: 6 }}>
+                    {(["present", "absent", "cancelled"] as SessionStatus[]).map((s) => {
+                      const on = st === s;
+                      return (
+                        <button
+                          key={s}
+                          onClick={() => one(r.subject.id, on ? "unmarked" : s)}
+                          aria-pressed={on}
+                          style={{
+                            flex: 1,
+                            padding: "8px 4px",
+                            borderRadius: 12,
+                            border: "none",
+                            fontSize: 12,
+                            fontWeight: 600,
+                            cursor: "pointer",
+                            background: on ? "var(--color-ink)" : "#f1eff6",
+                            color: on ? "#fff" : "var(--color-ink)",
+                          }}
+                        >
+                          {STATUS_META[s].label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </section>
+        </>
+      )}
     </>
   );
 }

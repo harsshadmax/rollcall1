@@ -1,120 +1,108 @@
+import Link from "next/link";
+import { getProfile, getStandings } from "@/lib/data/queries";
 import { Face, type Mood } from "@/components/features/Face";
 
-// Sample data for the scaffold. Phase 4/5 replaces this with the signed-in user's rows.
-const subjects: { code: string; name: string; mood: Mood; color: string }[] = [
-  { code: "DS", name: "Data Str.", mood: "happy", color: "var(--color-accent-attendance)" },
-  { code: "OS", name: "OS", mood: "neutral", color: "var(--color-accent-marks)" },
-  { code: "CN", name: "Networks", mood: "sleep", color: "var(--color-accent-calendar)" },
-  { code: "DM", name: "Maths", mood: "sad", color: "var(--color-status-risk-fill)" },
-];
+function moodFor(pct: number | null, threshold: number): Mood {
+  if (pct == null) return "neutral";
+  if (pct >= threshold * 100) return "happy";
+  if (pct >= (threshold - 0.1) * 100) return "neutral";
+  return "sad";
+}
 
-export default function TodayPage() {
+export default async function TodayPage() {
+  const [profile, { subjects, overall }] = await Promise.all([getProfile(), getStandings()]);
+  const name = profile?.display_name ?? "there";
+  const today = new Date().toLocaleDateString("en-GB", { weekday: "short", day: "2-digit", month: "short" });
+
   return (
     <>
       <header className="flex items-center justify-between" style={{ marginBottom: 10 }}>
         <div className="flex items-center" style={{ gap: 10 }}>
-          <div
-            style={{
-              width: 40,
-              height: 40,
-              borderRadius: 999,
-              background: "var(--color-accent-hero)",
-            }}
-          />
+          <div style={{ width: 40, height: 40, borderRadius: 999, background: "var(--color-accent-hero)" }} />
           <div>
             <div className="rc-tag">Welcome back</div>
-            <div style={{ fontWeight: 700 }}>Alex Miller</div>
+            <div style={{ fontWeight: 700 }}>{name}</div>
           </div>
         </div>
-        <span aria-hidden style={{ fontSize: 20, color: "var(--color-ink-muted)" }}>
+        <Link href="/subjects" aria-label="Manage subjects" style={{ fontSize: 20, color: "var(--color-ink-muted)", textDecoration: "none" }}>
           ☰
-        </span>
+        </Link>
       </header>
 
       <p className="rc-tag" style={{ margin: "0 0 6px" }}>
-        Mon 27 Oct
+        {today}
       </p>
-      <h1 className="font-display" style={{ fontSize: 24, fontWeight: 800, lineHeight: 1.15, margin: "0 0 14px" }}>
-        Hi Alex! Can you
-        <br />
-        skip today?
-      </h1>
 
-      <div className="flex" style={{ gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
-        {subjects.map((s) => (
-          <span key={s.code} className="rc-chip">
-            <i
-              style={{
-                width: 24,
-                height: 24,
-                borderRadius: 8,
-                background: s.color,
-                display: "inline-flex",
-                alignItems: "center",
-                justifyContent: "center",
-                color: "var(--color-ink)",
-              }}
-            >
-              <Face mood={s.mood} size={18} />
-            </i>
-            {s.name}
-          </span>
-        ))}
-      </div>
+      {subjects.length === 0 ? (
+        <section className="rc-card" style={{ background: "var(--color-accent-attendance)" }}>
+          <div className="rc-tag">Let&apos;s set up</div>
+          <p style={{ fontWeight: 700, margin: "4px 0 10px" }}>Add your subjects to start tracking.</p>
+          <Link href="/subjects" className="rc-submit" style={{ display: "inline-block", textDecoration: "none" }}>
+            Add subjects
+          </Link>
+        </section>
+      ) : (
+        <>
+          <h1 className="font-display" style={{ fontSize: 24, fontWeight: 800, lineHeight: 1.15, margin: "0 0 14px" }}>
+            Hi {name.split(" ")[0]}! Can you
+            <br />
+            skip today?
+          </h1>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
-        <div className="rc-card" style={{ background: "var(--color-accent-marks)" }}>
-          <div className="rc-tag">Overall</div>
-          <div className="rc-big" style={{ fontSize: 26, marginTop: 6 }}>
-            84%
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 14 }}>
+            <div className="rc-card" style={{ background: "var(--color-accent-marks)" }}>
+              <div className="rc-tag">Overall</div>
+              <div className="rc-big" style={{ fontSize: 26, marginTop: 6 }}>
+                {overall.pct == null ? "—" : `${overall.pct}%`}
+              </div>
+              <div className="rc-tag" style={{ marginTop: 2 }}>
+                {overall.held === 0 ? "nothing marked yet" : `${overall.present}/${overall.held} classes`}
+              </div>
+            </div>
+            <Link href="/attendance" className="rc-card" style={{ background: "var(--color-accent-schedule)", textDecoration: "none", color: "inherit" }}>
+              <div className="rc-tag">Mark today</div>
+              <div className="rc-big" style={{ fontSize: 26, marginTop: 6 }}>
+                →
+              </div>
+              <div className="rc-tag" style={{ marginTop: 2 }}>
+                tap to mark classes
+              </div>
+            </Link>
           </div>
-          <div className="rc-tag" style={{ marginTop: 2 }}>
-            above 80%
-          </div>
-        </div>
-        <div className="rc-card" style={{ background: "var(--color-accent-schedule)" }}>
-          <div className="rc-tag">At risk</div>
-          <div className="rc-big" style={{ fontSize: 26, marginTop: 6 }}>
-            1
-          </div>
-          <div className="rc-tag" style={{ marginTop: 2 }}>
-            subject below
-          </div>
-        </div>
-      </div>
 
-      <section className="rc-card" style={{ background: "var(--color-accent-attendance)" }}>
-        <div className="rc-tag">Quick mark · 2 left today</div>
-        <p style={{ fontWeight: 700, margin: "4px 0 10px" }}>Were you present for DBMS Lab?</p>
-        <div style={{ display: "flex", gap: 10 }}>
-          <button
-            style={{
-              flex: 1,
-              padding: 12,
-              borderRadius: 16,
-              border: "none",
-              fontWeight: 700,
-              background: "var(--color-ink)",
-              color: "#fff",
-            }}
-          >
-            Present
-          </button>
-          <button
-            style={{
-              flex: 1,
-              padding: 12,
-              borderRadius: 16,
-              border: "none",
-              fontWeight: 700,
-              background: "var(--color-surface)",
-              boxShadow: "var(--shadow-card)",
-            }}
-          >
-            Absent
-          </button>
-        </div>
-      </section>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+            {subjects.map((s) => {
+              const fill = `var(--color-${s.color_token ?? "accent-attendance"})`;
+              const sub =
+                s.pct == null
+                  ? "no classes yet"
+                  : s.unrecoverable
+                    ? "can't miss any"
+                    : s.canSkip > 0
+                      ? `can skip ${s.canSkip}`
+                      : s.mustAttend
+                        ? `attend ${s.mustAttend}`
+                        : "on the line";
+              return (
+                <div key={s.id} className="rc-card" style={{ background: fill, minHeight: 112, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+                  <div className="flex items-center" style={{ gap: 6 }}>
+                    <Face mood={moodFor(s.pct, s.threshold)} size={18} />
+                    <span className="rc-tag" style={{ color: "var(--color-ink)" }}>
+                      {s.code}
+                    </span>
+                  </div>
+                  <div>
+                    <div className="rc-big" style={{ fontSize: 26 }}>
+                      {s.pct == null ? "—" : `${s.pct}%`}
+                    </div>
+                    <div style={{ fontSize: 12, fontWeight: 600 }}>{sub}</div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </>
+      )}
     </>
   );
 }
