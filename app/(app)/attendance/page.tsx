@@ -1,4 +1,4 @@
-import { getDay } from "@/lib/data/queries";
+import { getDaySchedule } from "@/lib/data/queries";
 import { DayAttendance } from "@/components/features/DayAttendance";
 
 export const metadata = { title: "Attendance · RollCall" };
@@ -15,6 +15,6 @@ export default async function AttendancePage({
 }) {
   const { day } = await searchParams;
   const iso = /^\d{4}-\d{2}-\d{2}$/.test(day ?? "") ? (day as string) : todayIso();
-  const rows = await getDay(iso);
-  return <DayAttendance day={iso} rows={rows} />;
+  const { rows, hasTimetable } = await getDaySchedule(iso);
+  return <DayAttendance day={iso} rows={rows} hasTimetable={hasTimetable} />;
 }

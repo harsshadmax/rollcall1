@@ -5,7 +5,7 @@ import { useState, useTransition } from "react";
 import Link from "next/link";
 import { Face, type Mood } from "./Face";
 import { markSession, markWholeDay } from "@/lib/actions/app";
-import type { DayRow, SessionStatus } from "@/lib/data/types";
+import type { ScheduleRow, SessionStatus } from "@/lib/data/types";
 
 const STATUS_META: Record<SessionStatus, { label: string; mood: Mood; fill: string }> = {
   present: { label: "Present", mood: "happy", fill: "var(--color-accent-attendance)" },
@@ -18,14 +18,24 @@ function iso(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-export function DayAttendance({ day, rows }: { day: string; rows: DayRow[] }) {
+const keyOf = (subjectId: string, periodId: string | null) => `${subjectId}:${periodId ?? ""}`;
+
+export function DayAttendance({
+  day,
+  rows,
+  hasTimetable,
+}: {
+  day: string;
+  rows: ScheduleRow[];
+  hasTimetable: boolean;
+}) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const date = new Date(day + "T00:00:00");
 
   // optimistic local view so taps feel instant; server is source of truth on refresh
   const [local, setLocal] = useState<Record<string, SessionStatus>>({});
-  const statusOf = (subjectId: string, fallback: SessionStatus) => local[subjectId] ?? fallback;
+  const statusOf = (r: ScheduleRow) => local[keyOf(r.subject.id, r.periodId)] ?? r.status;
 
   function goDay(delta: number) {
     const n = new Date(date);
@@ -35,24 +45,28 @@ export function DayAttendance({ day, rows }: { day: string; rows: DayRow[] }) {
 
   function wholeDay(status: SessionStatus) {
     const next: Record<string, SessionStatus> = {};
-    for (const r of rows) if (statusOf(r.subject.id, r.status) !== "cancelled") next[r.subject.id] = status;
+    for (const r of rows) if (statusOf(r) !== "cancelled") next[keyOf(r.subject.id, r.periodId)] = status;
     setLocal((p) => ({ ...p, ...next }));
     startTransition(async () => {
-      await markWholeDay(day, status);
+      await markWholeDay(
+        day,
+        status,
+        rows.map((r) => ({ subjectId: r.subject.id, periodId: r.periodId })),
+      );
       router.refresh();
     });
   }
 
-  function one(subjectId: string, status: SessionStatus) {
-    setLocal((p) => ({ ...p, [subjectId]: status }));
+  function one(r: ScheduleRow, status: SessionStatus) {
+    setLocal((p) => ({ ...p, [keyOf(r.subject.id, r.periodId)]: status }));
     startTransition(async () => {
-      await markSession(subjectId, day, status);
+      await markSession(r.subject.id, day, status, r.periodId);
       router.refresh();
     });
   }
 
-  const present = rows.filter((r) => statusOf(r.subject.id, r.status) === "present").length;
-  const absent = rows.filter((r) => statusOf(r.subject.id, r.status) === "absent").length;
+  const present = rows.filter((r) => statusOf(r) === "present").length;
+  const absent = rows.filter((r) => statusOf(r) === "absent").length;
   const weekday = date.toLocaleDateString("en-GB", { weekday: "long" });
   const nice = date.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
 
@@ -76,15 +90,27 @@ export function DayAttendance({ day, rows }: { day: string; rows: DayRow[] }) {
       </div>
 
       {rows.length === 0 ? (
-        <section className="rc-card">
-          <div className="rc-tag">No subjects yet</div>
-          <p style={{ margin: "6px 0 10px" }}>Add your subjects first, then mark attendance here.</p>
-          <Link href="/subjects" className="rc-submit" style={{ display: "inline-block", textDecoration: "none" }}>
-            Add subjects
-          </Link>
-        </section>
+        hasTimetable ? (
+          <section className="rc-card">
+            <div className="rc-tag">No classes today</div>
+            <p style={{ margin: "6px 0 0" }}>Nothing scheduled on {weekday}. Enjoy the day off.</p>
+          </section>
+        ) : (
+          <section className="rc-card">
+            <div className="rc-tag">No subjects yet</div>
+            <p style={{ margin: "6px 0 10px" }}>Add your subjects first, then mark attendance here.</p>
+            <Link href="/subjects" className="rc-submit" style={{ display: "inline-block", textDecoration: "none" }}>
+              Add subjects
+            </Link>
+          </section>
+        )
       ) : (
         <>
+          {!hasTimetable && (
+            <p style={{ color: "var(--color-ink-muted)", fontSize: 12, margin: "0 0 10px" }}>
+              Showing all subjects. <Link href="/timetable">Build your timetable</Link> to see only each day&apos;s classes.
+            </p>
+          )}
           <section className="rc-card" style={{ marginBottom: 12 }}>
             <div className="rc-tag">Mark the whole day</div>
             <p style={{ fontSize: 13, color: "var(--color-ink-muted)", margin: "4px 0 10px" }}>
@@ -114,9 +140,9 @@ export function DayAttendance({ day, rows }: { day: string; rows: DayRow[] }) {
               Edit individual classes
             </div>
             {rows.map((r) => {
-              const st = statusOf(r.subject.id, r.status);
+              const st = statusOf(r);
               return (
-                <div key={r.subject.id} style={{ padding: "10px 0", borderTop: "1px solid #f0eff5" }}>
+                <div key={keyOf(r.subject.id, r.periodId)} style={{ padding: "10px 0", borderTop: "1px solid #f0eff5" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
                     <span
                       style={{
@@ -137,6 +163,7 @@ export function DayAttendance({ day, rows }: { day: string; rows: DayRow[] }) {
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontWeight: 600, fontSize: 14 }}>{r.subject.name}</div>
                       <div className="rc-tag">
+                        {r.time ? `${r.time} · ` : ""}
                         {r.subject.code} · {r.subject.kind}
                       </div>
                     </div>
@@ -147,7 +174,7 @@ export function DayAttendance({ day, rows }: { day: string; rows: DayRow[] }) {
                       return (
                         <button
                           key={s}
-                          onClick={() => one(r.subject.id, on ? "unmarked" : s)}
+                          onClick={() => one(r, on ? "unmarked" : s)}
                           aria-pressed={on}
                           style={{
                             flex: 1,

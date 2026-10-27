@@ -28,3 +28,27 @@ export interface DayRow {
   subject: Subject;
   status: SessionStatus;
 }
+
+export interface Period {
+  id: string;
+  idx: number;
+  starts_at: string;
+  ends_at: string;
+}
+
+/** One class on a given date: from the timetable when set, else a plain subject row. */
+export interface ScheduleRow {
+  slotId: string | null;
+  periodId: string | null;
+  time: string | null;
+  subject: Subject;
+  status: SessionStatus;
+}
+
+/** A timetable slot in the weekly grid. */
+export interface SlotRow {
+  slotId: string;
+  weekday: number; // 1 = Mon .. 7 = Sun
+  period: Period;
+  subject: Subject;
+}
