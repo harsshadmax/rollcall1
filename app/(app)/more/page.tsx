@@ -1,4 +1,11 @@
+import Link from "next/link";
 import { AccountActions } from "@/components/features/AccountActions";
+
+const links = [
+  { href: "/calendar", label: "Attendance calendar", sub: "Month view with your marks" },
+  { href: "/subjects", label: "Subjects", sub: "Add or edit your subjects" },
+  { href: "/timetable", label: "Timetable", sub: "Your weekly class schedule" },
+];
 
 export default function MorePage() {
   return (
@@ -7,8 +14,15 @@ export default function MorePage() {
         More
       </h1>
       <div className="rc-card">
-        <div className="rc-tag">Stats · Calendar · Settings</div>
-        <p style={{ marginTop: 6 }}>Streaks, the year calendar, data export and settings land here.</p>
+        {links.map((l) => (
+          <Link key={l.href} href={l.href} className="rc-rowbtn" style={{ textDecoration: "none", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span>
+              <span style={{ display: "block", fontWeight: 600 }}>{l.label}</span>
+              <span className="rc-tag">{l.sub}</span>
+            </span>
+            <span style={{ color: "var(--color-ink-muted)" }}>→</span>
+          </Link>
+        ))}
       </div>
       <AccountActions />
     </>

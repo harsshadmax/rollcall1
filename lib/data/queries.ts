@@ -114,6 +114,75 @@ export async function getStandings(): Promise<{
   };
 }
 
+export interface DayCell {
+  present: number;
+  absent: number;
+  cancelled: number;
+}
+export interface MonthAttendance {
+  year: number;
+  month: number; // 1-12
+  lastDay: number;
+  firstWeekday: number; // 0 = Monday .. 6 = Sunday
+  byDay: Record<number, DayCell>;
+  present: number;
+  held: number;
+  pct: number | null;
+  presentDays: number;
+  absentDays: number;
+}
+
+/** Per-day attendance for a month ("YYYY-MM") for the emoji calendar. */
+export async function getMonthAttendance(ym: string): Promise<MonthAttendance> {
+  const [y, m] = ym.split("-").map(Number);
+  const lastDay = new Date(y, m, 0).getDate();
+  const first = `${ym}-01`;
+  const last = `${ym}-${String(lastDay).padStart(2, "0")}`;
+  const firstWeekday = (new Date(y, m - 1, 1).getDay() + 6) % 7; // Monday-start
+
+  const { supabase, user } = await ctx();
+  const byDay: Record<number, DayCell> = {};
+  let present = 0;
+  let held = 0;
+  let presentDays = 0;
+  let absentDays = 0;
+
+  if (user) {
+    const { data } = await supabase
+      .from("class_sessions")
+      .select("day, status")
+      .gte("day", first)
+      .lte("day", last);
+    for (const r of data ?? []) {
+      const d = Number((r.day as string).slice(8, 10));
+      const cell = byDay[d] ?? { present: 0, absent: 0, cancelled: 0 };
+      if (r.status === "present") cell.present++;
+      else if (r.status === "absent") cell.absent++;
+      else if (r.status === "cancelled") cell.cancelled++;
+      byDay[d] = cell;
+    }
+    for (const cell of Object.values(byDay)) {
+      present += cell.present;
+      held += cell.present + cell.absent;
+      if (cell.absent > 0) absentDays++;
+      else if (cell.present > 0) presentDays++;
+    }
+  }
+
+  return {
+    year: y,
+    month: m,
+    lastDay,
+    firstWeekday,
+    byDay,
+    present,
+    held,
+    pct: attendancePct({ present, absent: held - present }),
+    presentDays,
+    absentDays,
+  };
+}
+
 export async function getPeriods(): Promise<Period[]> {
   const semesterId = await getActiveSemesterId();
   if (!semesterId) return [];

@@ -72,9 +72,14 @@ export function DayAttendance({
 
   return (
     <>
-      <h1 className="font-display" style={{ fontSize: 22, fontWeight: 800, margin: "4px 0 10px" }}>
-        Attendance
-      </h1>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", margin: "4px 0 10px" }}>
+        <h1 className="font-display" style={{ fontSize: 22, fontWeight: 800, margin: 0 }}>
+          Attendance
+        </h1>
+        <Link href="/calendar" className="rc-tag" style={{ textDecoration: "none" }}>
+          Calendar →
+        </Link>
+      </div>
 
       <div className="rc-card" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
         <button aria-label="Previous day" onClick={() => goDay(-1)} style={navBtn}>
