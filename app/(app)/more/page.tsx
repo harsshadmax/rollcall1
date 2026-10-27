@@ -2,6 +2,7 @@ import Link from "next/link";
 import { AccountActions } from "@/components/features/AccountActions";
 
 const links = [
+  { href: "/whatif", label: "Can I skip?", sub: "Plan which days you can miss" },
   { href: "/calendar", label: "Attendance calendar", sub: "Month view with your marks" },
   { href: "/subjects", label: "Subjects", sub: "Add or edit your subjects" },
   { href: "/timetable", label: "Timetable", sub: "Your weekly class schedule" },

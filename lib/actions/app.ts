@@ -152,6 +152,24 @@ export async function addClass(weekday: number, subjectId: string) {
   return { ok: true as const };
 }
 
+/** Set (or clear) a subject's final grade. */
+export async function setGrade(subjectId: string, grade: string) {
+  const { supabase, user } = await requireUser();
+  if (!grade) {
+    await supabase.from("subject_results").delete().eq("subject_id", subjectId).eq("attempt", 1);
+  } else {
+    const { data: existing } = await supabase
+      .from("subject_results")
+      .select("id")
+      .eq("subject_id", subjectId)
+      .eq("attempt", 1)
+      .maybeSingle();
+    if (existing) await supabase.from("subject_results").update({ grade }).eq("id", existing.id);
+    else await supabase.from("subject_results").insert({ user_id: user.id, subject_id: subjectId, grade, attempt: 1 });
+  }
+  revalidatePath("/marks");
+}
+
 export async function removeSlot(slotId: string) {
   const { supabase } = await requireUser();
   const { error } = await supabase.from("timetable_slots").delete().eq("id", slotId);

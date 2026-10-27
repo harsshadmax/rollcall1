@@ -76,9 +76,14 @@ export function DayAttendance({
         <h1 className="font-display" style={{ fontSize: 22, fontWeight: 800, margin: 0 }}>
           Attendance
         </h1>
-        <Link href="/calendar" className="rc-tag" style={{ textDecoration: "none" }}>
-          Calendar →
-        </Link>
+        <span style={{ display: "flex", gap: 12 }}>
+          <Link href="/whatif" className="rc-tag" style={{ textDecoration: "none" }}>
+            Can I skip? →
+          </Link>
+          <Link href="/calendar" className="rc-tag" style={{ textDecoration: "none" }}>
+            Calendar →
+          </Link>
+        </span>
       </div>
 
       <div className="rc-card" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>

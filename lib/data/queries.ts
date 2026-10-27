@@ -1,7 +1,7 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { attendancePct, projectAttendance } from "@/lib/domain/attendance";
-import type { Subject, SubjectStanding, SessionStatus, Period, ScheduleRow, SlotRow } from "./types";
+import type { Subject, SubjectStanding, SessionStatus, Period, ScheduleRow, SlotRow, UpcomingDay } from "./types";
 
 /** ISO date -> weekday 1 (Mon) .. 7 (Sun). */
 export function isoWeekday(iso: string): number {
@@ -112,6 +112,91 @@ export async function getStandings(): Promise<{
     subjects: standings,
     overall: { present: oPresent, held: oHeld, pct: attendancePct({ present: oPresent, absent: oHeld - oPresent }) },
   };
+}
+
+export interface GradeBand {
+  grade: string;
+  points: number;
+  counts_in_gpa: boolean;
+}
+
+export async function getGradeScale(): Promise<GradeBand[]> {
+  const { supabase, user } = await ctx();
+  if (!user) return [];
+  const { data: prof } = await supabase.from("profiles").select("grade_scale_id").eq("id", user.id).single();
+  const scaleId = prof?.grade_scale_id;
+  if (!scaleId) return [];
+  const { data } = await supabase
+    .from("grade_points")
+    .select("grade, points, counts_in_gpa")
+    .eq("grade_scale_id", scaleId)
+    .order("sort", { ascending: true });
+  return (data ?? []) as GradeBand[];
+}
+
+export interface MarksData {
+  subjects: (Subject & { grade: string | null })[];
+  scale: GradeBand[];
+  gpa: number | null;
+  points: number;
+  credits: number;
+}
+
+export async function getMarks(): Promise<MarksData> {
+  const [subjects, scale] = await Promise.all([listSubjects(), getGradeScale()]);
+  if (subjects.length === 0) return { subjects: [], scale, gpa: null, points: 0, credits: 0 };
+  const { supabase } = await ctx();
+  const { data: results } = await supabase
+    .from("subject_results")
+    .select("subject_id, grade")
+    .eq("attempt", 1)
+    .in(
+      "subject_id",
+      subjects.map((s) => s.id),
+    );
+  const gradeBySubject = new Map((results ?? []).map((r) => [r.subject_id, r.grade as string]));
+  const bandByGrade = new Map(scale.map((b) => [b.grade, b]));
+
+  let points = 0;
+  let credits = 0;
+  const withGrades = subjects.map((s) => {
+    const grade = gradeBySubject.get(s.id) ?? null;
+    const band = grade ? bandByGrade.get(grade) : undefined;
+    if (band?.counts_in_gpa) {
+      points += Number(s.credits) * Number(band.points);
+      credits += Number(s.credits);
+    }
+    return { ...s, grade };
+  });
+
+  return { subjects: withGrades, scale, points, credits, gpa: credits ? Math.round((points / credits) * 100) / 100 : null };
+}
+
+/** Scheduled classes for the next `days` days (from the weekly timetable), for the what-if planner. */
+export async function getUpcoming(days = 14): Promise<UpcomingDay[]> {
+  const slots = await getTimetable();
+  if (slots.length === 0) return [];
+  const byWeekday = new Map<number, typeof slots>();
+  for (const s of slots) {
+    const arr = byWeekday.get(s.weekday) ?? [];
+    arr.push(s);
+    byWeekday.set(s.weekday, arr);
+  }
+  const out: UpcomingDay[] = [];
+  const start = new Date();
+  for (let i = 1; i <= days; i++) {
+    const d = new Date(start);
+    d.setDate(d.getDate() + i);
+    const wd = ((d.getDay() + 6) % 7) + 1; // 1..7 Mon..Sun
+    const daySlots = (byWeekday.get(wd) ?? []).slice().sort((a, b) => a.period.idx - b.period.idx);
+    if (daySlots.length === 0) continue;
+    out.push({
+      iso: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`,
+      label: d.toLocaleDateString("en-GB", { weekday: "short", day: "2-digit", month: "short" }),
+      classes: daySlots.map((s) => ({ subjectId: s.subject.id, name: s.subject.name, code: s.subject.code, periodId: s.period.id })),
+    });
+  }
+  return out;
 }
 
 export interface DayCell {

@@ -95,6 +95,11 @@ export default async function TodayPage() {
                     <div className="rc-big" style={{ fontSize: 26 }}>
                       {s.pct == null ? "—" : `${s.pct}%`}
                     </div>
+                    {/* bunk-budget meter: fill = attendance %, notch at the threshold line */}
+                    <div style={{ position: "relative", height: 7, borderRadius: 999, background: "rgba(20,20,30,0.14)", margin: "6px 0 4px" }}>
+                      <div style={{ width: `${Math.min(s.pct ?? 0, 100)}%`, height: "100%", borderRadius: 999, background: "var(--color-ink)" }} />
+                      <div style={{ position: "absolute", top: -1, bottom: -1, left: `${s.threshold * 100}%`, width: 2, background: "var(--color-ink)", opacity: 0.5 }} />
+                    </div>
                     <div style={{ fontSize: 12, fontWeight: 600 }}>{sub}</div>
                   </div>
                 </div>

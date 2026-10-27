@@ -45,6 +45,12 @@ export interface ScheduleRow {
   status: SessionStatus;
 }
 
+export interface UpcomingDay {
+  iso: string;
+  label: string;
+  classes: { subjectId: string; name: string; code: string; periodId: string }[];
+}
+
 /** A timetable slot in the weekly grid. */
 export interface SlotRow {
   slotId: string;
