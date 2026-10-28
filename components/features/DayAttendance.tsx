@@ -53,7 +53,7 @@ export function DayAttendance({
         status,
         rows.map((r) => ({ subjectId: r.subject.id, periodId: r.periodId })),
       );
-      router.refresh();
+      // no router.refresh(): the action's revalidatePath already re-renders this page
     });
   }
 
@@ -61,7 +61,6 @@ export function DayAttendance({
     setLocal((p) => ({ ...p, [keyOf(r.subject.id, r.periodId)]: status }));
     startTransition(async () => {
       await markSession(r.subject.id, day, status, r.periodId);
-      router.refresh();
     });
   }
 

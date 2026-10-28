@@ -22,12 +22,17 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
     try {
       const supabase = createClient();
       if (isSignUp) {
-        const { error } = await supabase.auth.signUp({
+        const { data, error } = await supabase.auth.signUp({
           email,
           password,
           options: { data: { display_name: name || email.split("@")[0] } },
         });
         if (error) throw error;
+        if (!data.session) {
+          // project requires email confirmation: no session yet, so don't navigate silently
+          setError("Account created. Check your email and click the confirmation link, then sign in.");
+          return;
+        }
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
@@ -35,7 +40,12 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
       router.push("/today");
       router.refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong.");
+      const msg = err instanceof Error ? err.message : "Something went wrong.";
+      setError(
+        /not confirmed/i.test(msg)
+          ? "Your email isn't confirmed yet. Open the confirmation email we sent, then sign in."
+          : msg,
+      );
     } finally {
       setBusy(false);
     }

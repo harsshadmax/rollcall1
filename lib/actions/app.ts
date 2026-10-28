@@ -7,11 +7,11 @@ import { getActiveSemesterId } from "@/lib/data/queries";
 
 async function requireUser() {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) throw new Error("Not signed in.");
-  return { supabase, user };
+  // Local JWT verification (no network call); RLS still enforces ownership server-side.
+  const { data } = await supabase.auth.getClaims();
+  const sub = data?.claims?.sub;
+  if (!sub) throw new Error("Not signed in.");
+  return { supabase, user: { id: sub as string } };
 }
 
 /** Ensure the student has an active semester; create a default one on first use. */
@@ -220,13 +220,18 @@ export async function markWholeDay(
   const exByKey = new Map((existing ?? []).map((e) => [`${e.subject_id}:${e.period_id ?? ""}`, e]));
 
   const inserts: { user_id: string; subject_id: string; day: string; status: string; period_id: string | null }[] = [];
+  const updateIds: string[] = [];
   for (const c of classes) {
     const ex = exByKey.get(`${c.subjectId}:${c.periodId ?? ""}`);
     if (ex?.status === "cancelled") continue;
-    if (ex) await supabase.from("class_sessions").update({ status: s }).eq("id", ex.id);
+    if (ex) updateIds.push(ex.id);
     else inserts.push({ user_id: user.id, subject_id: c.subjectId, day, status: s, period_id: c.periodId });
   }
-  if (inserts.length) await supabase.from("class_sessions").insert(inserts);
+  // one bulk update + one bulk insert, run concurrently (was one awaited round-trip per class)
+  await Promise.all([
+    updateIds.length ? supabase.from("class_sessions").update({ status: s }).in("id", updateIds) : null,
+    inserts.length ? supabase.from("class_sessions").insert(inserts) : null,
+  ]);
   revalidatePath("/attendance");
   revalidatePath("/today");
 }

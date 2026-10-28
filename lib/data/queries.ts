@@ -1,4 +1,5 @@
 import "server-only";
+import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { attendancePct, projectAttendance } from "@/lib/domain/attendance";
 import type { Subject, SubjectStanding, SessionStatus, Period, ScheduleRow, SlotRow, UpcomingDay } from "./types";
@@ -11,15 +12,18 @@ export function isoWeekday(iso: string): number {
 
 const SUBJECT_COLS = "id, code, name, credits, kind, color_token, instructor, room, threshold_override";
 
-async function ctx() {
+/**
+ * Per-request auth context. getClaims() verifies the JWT locally (no network call to
+ * Supabase Auth), and cache() makes every query in one render share a single client + check.
+ */
+const ctx = cache(async () => {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  return { supabase, user };
-}
+  const { data } = await supabase.auth.getClaims();
+  const sub = data?.claims?.sub;
+  return { supabase, user: sub ? { id: sub as string } : null };
+});
 
-export async function getProfile() {
+export const getProfile = cache(async () => {
   const { supabase, user } = await ctx();
   if (!user) return null;
   const { data } = await supabase
@@ -28,30 +32,30 @@ export async function getProfile() {
     .eq("id", user.id)
     .single();
   return data;
-}
+});
 
-export async function getActiveSemesterId(): Promise<string | null> {
+export const getActiveSemesterId = cache(async (): Promise<string | null> => {
   const { supabase, user } = await ctx();
   if (!user) return null;
-  const { data } = await supabase
-    .from("semesters")
-    .select("id")
-    .eq("is_active", true)
-    .maybeSingle();
+  const { data } = await supabase.from("semesters").select("id").eq("is_active", true).maybeSingle();
   return data?.id ?? null;
-}
+});
 
-export async function listSubjects(): Promise<Subject[]> {
-  const semesterId = await getActiveSemesterId();
-  if (!semesterId) return [];
-  const { supabase } = await ctx();
+/** Active semester's subjects in ONE query (inner-join filter instead of a semester lookup first). */
+export const listSubjects = cache(async (): Promise<Subject[]> => {
+  const { supabase, user } = await ctx();
+  if (!user) return [];
   const { data } = await supabase
     .from("subjects")
-    .select("id, code, name, credits, kind, color_token, instructor, room, threshold_override")
-    .eq("semester_id", semesterId)
+    .select(`${SUBJECT_COLS}, semesters!inner(is_active)`)
+    .eq("semesters.is_active", true)
     .order("created_at", { ascending: true });
-  return (data ?? []) as Subject[];
-}
+  return ((data ?? []) as unknown as (Subject & { semesters?: unknown })[]).map((row) => {
+    const { semesters: _ignored, ...subject } = row;
+    void _ignored;
+    return subject as Subject;
+  });
+});
 
 function thresholdFor(
   s: Subject,
@@ -300,20 +304,25 @@ function fmt(t: string | null): string | null {
 
 /** The classes to mark on a date: the day's timetable, or every subject if no timetable exists yet. */
 export async function getDaySchedule(iso: string): Promise<{ rows: ScheduleRow[]; hasTimetable: boolean }> {
-  const subjects = await listSubjects();
-  if (subjects.length === 0) return { rows: [], hasTimetable: false };
-  const { supabase } = await ctx();
-  const semesterId = await getActiveSemesterId();
+  // Stage 1: independent lookups in parallel (all are request-cached / single round-trip).
+  const [subjects, semesterId, { supabase }] = await Promise.all([listSubjects(), getActiveSemesterId(), ctx()]);
+  if (subjects.length === 0 || !semesterId) return { rows: [], hasTimetable: false };
 
-  const { count: slotCount } = await supabase
-    .from("timetable_slots")
-    .select("id", { count: "exact", head: true })
-    .eq("semester_id", semesterId);
+  // Stage 2: the three data queries run concurrently instead of one after another.
+  const weekday = isoWeekday(iso);
+  const [{ count: slotCount }, { data: slots }, { data: sessions }] = await Promise.all([
+    supabase.from("timetable_slots").select("id", { count: "exact", head: true }).eq("semester_id", semesterId),
+    supabase
+      .from("timetable_slots")
+      .select(`id, period:periods(id, idx, starts_at, ends_at), subject:subjects(${SUBJECT_COLS})`)
+      .eq("semester_id", semesterId)
+      .eq("weekday", weekday),
+    supabase.from("class_sessions").select("period_id, subject_id, status").eq("day", iso),
+  ]);
   const hasTimetable = (slotCount ?? 0) > 0;
 
   if (!hasTimetable) {
     // fallback: every subject, no period, keyed by (subject, day)
-    const { data: sessions } = await supabase.from("class_sessions").select("subject_id, status").eq("day", iso);
     const byId = new Map<string, SessionStatus>();
     for (const r of sessions ?? []) byId.set(r.subject_id, r.status as SessionStatus);
     return {
@@ -322,14 +331,6 @@ export async function getDaySchedule(iso: string): Promise<{ rows: ScheduleRow[]
     };
   }
 
-  const weekday = isoWeekday(iso);
-  const { data: slots } = await supabase
-    .from("timetable_slots")
-    .select(`id, period:periods(id, idx, starts_at, ends_at), subject:subjects(${SUBJECT_COLS})`)
-    .eq("semester_id", semesterId)
-    .eq("weekday", weekday);
-
-  const { data: sessions } = await supabase.from("class_sessions").select("period_id, subject_id, status").eq("day", iso);
   const statusByKey = new Map<string, SessionStatus>();
   for (const r of sessions ?? []) statusByKey.set(`${r.subject_id}:${r.period_id ?? ""}`, r.status as SessionStatus);
 
